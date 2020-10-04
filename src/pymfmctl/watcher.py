@@ -5,30 +5,17 @@ import logging
 import time
 import shutil
 import json
+import queue
 from .config import Config
+from .log import logger
 from mfm_griddata_parser.grid_data import GridData
 from mfm_griddata_parser.grid_search import GridSearch
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
-# create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# add formatter to ch
-ch.setFormatter(formatter)
-
-# add ch to logger
-logger.addHandler(ch)
-
 class Watcher(multiprocessing.Process):
-    def __init__(self, config: Config, runner_queue: multiprocessing.Queue):
+    def __init__(self, config: Config, runner_queue: multiprocessing.Queue, watcher_queue: multiprocessing.Queue):
         self.shutdown_callback = multiprocessing.Event()
         self.runner_queue = runner_queue
+        self.queue = watcher_queue
         self.config = config
         self.result = {"matches": [], "filtered_grids":[]}
         self.hit = False
@@ -69,12 +56,28 @@ class Watcher(multiprocessing.Process):
                 match.pop("hit")
                 self.result["filtered_grids"].append([site.get_dict() for site in gs.filtered_grid])
 
+    def check_queue(self):
+        try:
+            self.command(self.queue.get_nowait())
+        except queue.Empty:
+            pass
+
+    def command(self, command: str):
+        """
+        all commands executed by the queue are done here.
+        """
+        logger.info(f"received command: {command}")
+        func = {
+            "shutdown": self.shutdown_callback.set
+            }
+        func[command]()
         
     def run(self):
-        #first, see what directorys already exist in the tmp dir.
+        #first, see what directories already exist in the tmp dir.
         not_our_dirs = set(os.listdir(self.config.tmp_path))
         # then, wait to find the directory we're monitoring.
         while True:
+            self.check_queue()
             if self.shutdown_callback.is_set():
                 break
             ls =  set(os.listdir(self.config.tmp_path))
@@ -87,6 +90,8 @@ class Watcher(multiprocessing.Process):
             time.sleep(2)
         # next, process the mfms json output
         while not self.hit:
+            self.check_queue()
+
             if self.shutdown_callback.is_set():
                 break
             new_file = self.compare_file_set()
@@ -123,4 +128,4 @@ class Watcher(multiprocessing.Process):
             if self.config.stop_mfms:
                 logger.info("Sending shutdown command to runner")
                 self.runner_queue.put("shutdown")
-
+            self.check_queue()

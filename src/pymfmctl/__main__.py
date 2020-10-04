@@ -1,8 +1,11 @@
 import multiprocessing
+import argparse
+import logging
+from datetime import datetime
 from .runner import Runner
 from .watcher import Watcher
 from .config import Config
-import argparse
+from .log import logger, set_log_file
 
 parser = argparse.ArgumentParser()
 
@@ -15,18 +18,29 @@ def main():
         config = Config(args.config)
     except:
         raise Exception(f"Error loading config: {args.config}")
+    config.output_path = f'{config.output_path}/{str(datetime.now().timestamp())}'
+    set_log_file(config.output_path)
+
+    logger.info(f"Begin pymfmctl.")
+    logger.info(f"Set output dir to {config.output_path}")
+
+    restarts = 0
     while True:
+        logger.info(f"Starting a new simulation. Number of restarts: {restarts}")
+        ++restarts
         runner_queue = multiprocessing.Queue()
+        watcher_queue = multiprocessing.Queue()
 
         # watcher starts before runner
-        w = Watcher(config, runner_queue)
+        w = Watcher(config, runner_queue, watcher_queue)
         w.start()
         
-        r = Runner(config, runner_queue)
+        r = Runner(config, runner_queue, watcher_queue)
         r.start()
 
         r.join()
         w.join()
+        
     
 if __name__ == "__main__":
     main()

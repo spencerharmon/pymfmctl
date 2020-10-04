@@ -3,28 +3,15 @@ import subprocess
 import time
 import logging
 from .config import Config
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
-# create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# add formatter to ch
-ch.setFormatter(formatter)
-
-# add ch to logger
-logger.addHandler(ch)
+from .log import logger
+import queue
 
 class Runner(multiprocessing.Process):
-    def __init__(self, config: Config, queue: multiprocessing.Queue):
+    def __init__(self, config: Config, queue: multiprocessing.Queue, watcher_queue: multiprocessing.Queue):
         self.shutdown_callback = multiprocessing.Event()
         self.config = config
         self.queue = queue
+        self.watcher_queue = watcher_queue
         super().__init__()
 
     def command(self, command: str):
@@ -40,5 +27,15 @@ class Runner(multiprocessing.Process):
     def run(self):
         proc = subprocess.Popen(self.config.command, shell=True)
         while not self.shutdown_callback.is_set():
-            self.command(self.queue.get())
+            code = proc.poll()
+            if code is not None:
+                logger.info(f"Process exited with return code {code}")
+                self.watcher_queue.put("shutdown")
+                break
+            try:
+                self.command(self.queue.get_nowait())
+            except queue.Empty:
+                pass
+
+            time.sleep(1)
         proc.kill()
