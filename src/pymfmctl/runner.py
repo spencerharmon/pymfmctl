@@ -1,4 +1,5 @@
 import multiprocessing
+import psutil
 import subprocess
 import time
 import logging
@@ -40,6 +41,10 @@ class Runner(multiprocessing.Process):
 
             time.sleep(1)
         logger.info(f"killing child process {proc.pid}")
+        parent = psutil.Process(proc.pid)
+        # or parent.children() for recursive=False
+        for child in parent.children(recursive=True):
+            child.kill()
         proc.kill()
         ret = proc.returncode
         while not ret:
