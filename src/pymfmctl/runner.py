@@ -46,8 +46,3 @@ class Runner(multiprocessing.Process):
         for child in parent.children(recursive=True):
             child.kill()
         proc.kill()
-        ret = proc.returncode
-        while not ret:
-            ret = proc.returncode
-            time.sleep(1)
-        logger.info(f"child {proc.pid}: exit {proc.returncode}")
