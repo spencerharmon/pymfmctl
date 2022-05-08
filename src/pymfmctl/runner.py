@@ -6,6 +6,7 @@ from .config import Config
 from .log import logger
 import queue
 
+
 class Runner(multiprocessing.Process):
     def __init__(self, config: Config, queue: multiprocessing.Queue, watcher_queue: multiprocessing.Queue):
         self.shutdown_callback = multiprocessing.Event()
@@ -21,9 +22,9 @@ class Runner(multiprocessing.Process):
         logger.info(f"received command: {command}")
         func = {
             "shutdown": self.shutdown_callback.set
-            }
+        }
         func[command]()
-        
+
     def run(self):
         proc = subprocess.Popen(self.config.command, shell=True)
         while not self.shutdown_callback.is_set():
@@ -39,3 +40,4 @@ class Runner(multiprocessing.Process):
 
             time.sleep(1)
         proc.kill()
+        proc.wait()
