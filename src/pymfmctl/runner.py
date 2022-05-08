@@ -39,5 +39,10 @@ class Runner(multiprocessing.Process):
                 pass
 
             time.sleep(1)
+        logger.info(f"killing child process {proc.pid}")
         proc.kill()
-        proc.wait()
+        ret = proc.returncode
+        while not ret:
+            ret = proc.returncode
+            time.sleep(1)
+        logger.info(f"child {proc.pid}: exit {proc.returncode}")
