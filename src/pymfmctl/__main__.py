@@ -27,7 +27,7 @@ def main():
     restarts = 0
     while True:
         logger.info(f"Starting a new simulation. Number of restarts: {restarts}")
-        ++restarts
+        restarts += 1
         runner_queue = multiprocessing.Queue()
         watcher_queue = multiprocessing.Queue()
 

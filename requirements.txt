@@ -1,0 +1,2 @@
+mfm-griddata-parser==0.1
+PyYAML==5.3.1
